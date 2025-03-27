@@ -15,7 +15,7 @@ services:
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
-      interval: 10s
+      interval: 1s
       timeout: 5s
       retries: 5
   app:
@@ -26,6 +26,7 @@ services:
       - .:/app
     ports:
       - "3000:3000"
+      - "3001:3001"
     environment:
       - PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/root/.local/bin
       - DATABASE_URL=postgres://postgres:postgres@db:5432/postgres
@@ -36,6 +37,7 @@ services:
       retries: 3
     command: >
       sh -c '
+        apt-get update && apt-get install -y tini &&
         if ! command -v wasp &> /dev/null; then
           echo "Installing WASP..." &&
           curl -sSL https://get.wasp.sh/installer.sh | sh
@@ -52,7 +54,7 @@ services:
           cd myapp/app
         fi &&
         echo "Starting Wasp app..." &&
-        wasp start
+        exec tini -- wasp start
       '
     depends_on:
       db:
