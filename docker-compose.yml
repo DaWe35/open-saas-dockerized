@@ -1,0 +1,63 @@
+version: '3.8'
+
+services:
+  db:
+    container_name: wasp-db
+    image: postgres:16-bookworm
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=postgres
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+  app:
+    container_name: wasp-app
+    image: node:20-bookworm
+    working_dir: /app
+    volumes:
+      - .:/app
+    ports:
+      - "3000:3000"
+    environment:
+      - PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/root/.local/bin
+      - DATABASE_URL=postgres://postgres:postgres@db:5432/postgres
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    command: >
+      sh -c '
+        if ! command -v wasp &> /dev/null; then
+          echo "Installing WASP..." &&
+          curl -sSL https://get.wasp.sh/installer.sh | sh
+        fi &&
+        if [ ! -d "myapp" ]; then
+          echo "Creating new Wasp app..." &&
+          wasp new -t saas myapp &&
+          cd myapp/app &&
+          echo "Copying .env.server.example to .env.server..." &&
+          cp .env.server.example .env.server &&
+          echo "Running database migrations..." &&
+          wasp db migrate-dev --name init
+        else
+          cd myapp/app
+        fi &&
+        echo "Starting Wasp app..." &&
+        wasp start
+      '
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
+    name: wasp_postgres_data
