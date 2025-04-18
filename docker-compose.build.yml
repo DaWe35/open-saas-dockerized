@@ -1,0 +1,37 @@
+services:
+
+  app-build:
+    container_name: wasp-app-build
+    image: node:20-bookworm
+    restart: "no"
+    working_dir: /app
+    volumes:
+      - .:/app
+    environment:
+      - PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/root/.local/bin
+    command: >
+      sh -c '
+        if ! command -v wasp &> /dev/null; then
+          echo "Installing WASP..." &&
+          curl -sSL https://get.wasp.sh/installer.sh | sh
+        fi &&
+        cd myapp/app &&
+        echo "Building Wasp app..." &&
+        wasp build &&
+        cp -r .wasp/ .wasp-prod/ &&
+        cd .wasp-prod/build/web-app &&
+        npm install && REACT_APP_API_URL=${WASP_SERVER_URL} npm run build
+      '
+
+  blog-build:
+    container_name: wasp-blog-build
+    image: node:20-bookworm
+    restart: "no"
+    working_dir: /app/myapp/blog
+    volumes:
+      - .:/app
+    command: >
+      sh -c '
+        npm install &&
+        npm run build
+      '

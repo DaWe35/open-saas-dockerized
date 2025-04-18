@@ -6,9 +6,9 @@
 
 ## Setup
 1. Clone the repository
-2. Run the development environment:
+2. Run setup and start development environment. This will create a new myapp folder and migrate the database, if the myapp folder is not present:
 ```bash
-docker compose up -d
+docker compose -f docker-compose.dev.yml up -d
 ```
 
 3. See logs:
@@ -16,7 +16,25 @@ docker compose up -d
 docker compose logs -f
 ```
 
-The application will be available at [http://localhost:3000](http://localhost:3000) 
+The application will be available at [http://localhost:3000](http://localhost:3000) (you can change this port in the `.env` file `APP_PORT` variable)
+
+## Database migration
+
+Run this after you changed the prisma database schema.
+
+```bash
+docker compose -f docker-compose.migrate.yml up
+```
+
+## Deploy
+Build:
+```bash
+docker compose -f docker-compose.build.yml up
+```
+Host:
+```bash
+docker compose -f docker-compose.prod.yml up
+```
 
 ## Database Backup
 

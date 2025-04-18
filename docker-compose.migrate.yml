@@ -1,0 +1,33 @@
+services:
+  db:
+    extends:
+      file: docker-compose.base.yml
+      service: db
+    networks:
+      - wasp-network
+
+  migrate:
+    extends:
+      file: docker-compose.base.yml
+      service: app
+    container_name: wasp-migrate
+    restart: "no"
+    command: >
+      sh -c '
+        if ! command -v wasp &> /dev/null; then
+          apt-get update && apt-get install -y tini &&
+          echo "Installing WASP..." &&
+          curl -sSL https://get.wasp.sh/installer.sh | sh
+        fi &&
+        cd myapp/app &&
+        echo "Running database migrations..." &&
+        wasp db migrate-dev --name add_api_keys
+      '
+
+networks:
+  wasp-network:
+    name: wasp-network
+
+volumes:
+  postgres_data:
+    name: wasp_postgres_data 

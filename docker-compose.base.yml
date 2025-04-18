@@ -1,0 +1,107 @@
+services:
+  db:
+    container_name: wasp-db
+    image: postgres:16-bookworm
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=${DB_USER_AND_DB}
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+    ports:
+      - "127.0.0.1:${DB_PORT}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER_AND_DB}"]
+      interval: 1s
+      timeout: 5s
+      retries: 5
+    networks:
+      - wasp-network
+
+  app:
+    container_name: wasp-app-dev
+    image: node:20-bookworm
+    restart: "no"
+    working_dir: /app
+    volumes:
+      - .:/app
+    ports:
+      - "${APP_PORT}:3000"
+      - "${APP_BACKEND_PORT}:3001"
+    environment:
+      - PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/root/.local/bin
+      - JWT_SECRET=${JWT_SECRET}
+      - MAILGUN_API_KEY=${MAILGUN_API_KEY}
+      - MAILGUN_DOMAIN=${MAILGUN_DOMAIN}
+      - MAILGUN_API_URL=${MAILGUN_API_URL}
+      - DATABASE_URL=${DATABASE_URL}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:${APP_PORT}"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    command: >
+      sh -c '
+        if ! command -v wasp &> /dev/null; then
+          echo "Installing WASP..." &&
+          curl -sSL https://get.wasp.sh/installer.sh | sh
+        fi &&
+        if [ ! -d "myapp" ]; then
+          echo "No app found in 'myapp' directory... Exiting."
+          exit 0
+        fi &&
+        cd myapp/app &&
+        echo "Building Wasp app..." &&
+        wasp build
+      '
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - wasp-network
+
+  blog:
+    container_name: wasp-blog-dev
+    image: node:20-bookworm
+    restart: "no"
+    working_dir: /app
+    volumes:
+      - .:/app
+    ports:
+      - "0.0.0.0:${BLOG_PORT}:4321"
+    command: >
+      sh -c '
+        cd myapp/blog &&
+        npm install &&
+        npm run build
+      '
+    depends_on:
+      db:
+        condition: service_healthy
+
+  pgadmin:
+    container_name: wasp-pgadmin
+    image: dpage/pgadmin4:latest
+    restart: unless-stopped
+    environment:
+      - PGADMIN_DEFAULT_EMAIL=${PGADMIN_EMAIL}
+      - PGADMIN_DEFAULT_PASSWORD=${PGADMIN_PASSWORD}
+    ports:
+      - "${PGADMIN_PORT}:80"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - wasp-network
+        
+volumes:
+  postgres_data:
+    name: wasp_postgres_data
+  pgadmin_data:
+    name: wasp_pgadmin_data
+
+networks:
+  wasp-network:
+    name: wasp-network

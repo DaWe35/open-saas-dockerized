@@ -1,0 +1,64 @@
+services:
+  db:
+    extends:
+      file: docker-compose.base.yml
+      service: db
+    networks:
+      - wasp-network
+
+  app:
+    extends:
+      file: docker-compose.base.yml
+      service: app
+    command: >
+      sh -c '
+        if ! command -v wasp &> /dev/null; then
+          apt-get update && apt-get install -y tini &&
+          echo "Installing WASP..." &&
+          curl -sSL https://get.wasp.sh/installer.sh | sh
+        fi &&
+        if [ ! -d "myapp" ]; then
+          echo "Creating new Wasp app..." &&
+          wasp new -t saas myapp &&
+          cd myapp/app &&
+          echo "Copying .env.server.example to .env.server..." &&
+          cp .env.server.example .env.server &&
+          echo "Running database migrations..." &&
+          wasp db migrate-dev --name init
+        else
+          cd myapp/app
+        fi &&
+        echo "Starting Wasp app..." &&
+        exec tini -- wasp start
+      '
+    networks:
+      - wasp-network
+
+  blog:
+    extends:
+      file: docker-compose.base.yml
+      service: blog
+    command: >
+      sh -c '
+        apt-get update && apt-get install -y tini &&
+        cd myapp/blog &&
+        npm install &&
+        exec tini -- npm run dev
+      '
+
+  pgadmin:
+    extends:
+      file: docker-compose.base.yml
+      service: pgadmin
+    networks:
+      - wasp-network
+
+volumes:
+  postgres_data:
+    name: wasp_postgres_data
+  pgadmin_data:
+    name: wasp_pgadmin_data
+
+networks:
+  wasp-network:
+    name: wasp-network
